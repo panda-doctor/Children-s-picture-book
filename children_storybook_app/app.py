@@ -5,13 +5,16 @@ import os
 import uuid
 from pathlib import Path
 
-from flask import Flask, abort, render_template, request, jsonify, send_file, send_from_directory
+from flask import (
+    Flask, abort, render_template, request, jsonify, send_file,
+    send_from_directory, Response, stream_with_context
+)
 from werkzeug.utils import secure_filename
 
 from config import Config, DATA_DIR, STORIES_DIR, BOOKS_DIR, IMAGES_DIR
 from utils.content_filter import validate_story
 from utils.story_parser import StoryParser, create_demo_story
-from utils.image_generator import generate_book_images
+from utils.image_generator import generate_book_images, iter_generate_book_images
 from utils.layout_engine import create_picture_book
 
 app = Flask(__name__)
@@ -227,6 +230,68 @@ def api_generate_book():
         return json_response(True, "绘本生成成功", data=book_meta)
     except Exception as e:
         return json_response(False, f"绘本排版失败: {str(e)}", status_code=500)
+
+
+@app.route("/api/book/generate/stream", methods=["POST"])
+def api_generate_book_stream():
+    """生成绘本（流式版）：以 SSE 逐页推送插画生成进度，最后推送绘本结果。
+
+    前端用 fetch + ReadableStream 消费，事件为 `data: {json}\\n\\n` 格式。
+    """
+    data = request.get_json() or {}
+    story = data.get("story")
+    style = data.get("style", "cartoon")
+
+    if not story or not story.get("chapters"):
+        return json_response(False, "故事数据不能为空", status_code=400)
+
+    def sse(event: dict) -> str:
+        return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+    @stream_with_context
+    def generate():
+        try:
+            # 保存故事
+            story_id = story.get("id") or str(uuid.uuid4())
+            story["id"] = story_id
+            story_path = STORIES_DIR / f"{story_id}.json"
+            with open(story_path, "w", encoding="utf-8") as f:
+                json.dump(story, f, ensure_ascii=False, indent=2)
+
+            yield sse({"stage": "start", "message": "开始生成绘本"})
+
+            # 逐页生成插画并推送进度
+            image_results = []
+            for event in iter_generate_book_images(story, style):
+                if event["type"] == "progress":
+                    chapter = event["chapter"]
+                    yield sse({
+                        "stage": "image",
+                        "current": event["current"],
+                        "total": event["total"],
+                        "chapter": chapter.get("title", "") if isinstance(chapter, dict) else "",
+                    })
+                elif event["type"] == "page_done":
+                    image_results.append(event["result"])
+
+            # 排版生成绘本
+            yield sse({"stage": "layout", "message": "正在排版生成绘本..."})
+            book_meta = create_picture_book(story, image_results)
+            book_meta["image_results"] = image_results
+
+            yield sse({
+                "stage": "done",
+                "success": True,
+                "book": {
+                    "id": book_meta["id"],
+                    "title": book_meta["title"],
+                    "page_count": book_meta["page_count"],
+                },
+            })
+        except Exception as e:
+            yield sse({"stage": "error", "success": False, "message": str(e)})
+
+    return Response(generate(), mimetype="text/event-stream")
 
 
 @app.route("/api/books/list", methods=["GET"])

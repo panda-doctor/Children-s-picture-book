@@ -154,6 +154,61 @@ class ImageGenerator:
                 return self._generate_local_image(prompt, size, local_path, f"unknown_error: {str(e)}")
             return {"success": False, "error": f"未知错误: {str(e)}", "prompt": prompt}
     
+    def _generate_chapter_image(self, story: Dict, chapter: Dict, index: int,
+                                title: str, style: str, character_description: str) -> Dict:
+        """生成单个章节的插画（含缓存命中判断），返回该章节的图片结果。"""
+        prompt = self.generate_prompt(
+            chapter["content"],
+            title,
+            style,
+            character_description
+        )
+
+        # 根据章节序号命名输出文件
+        story_id = story.get("id", "unknown")
+        safe_title = self._safe_filename(title)[:30]
+        output_filename = f"{safe_title}_{story_id[:8]}_page{index}.png"
+        output_path = self.images_dir / output_filename
+
+        # 若有缓存则直接返回
+        if output_path.exists():
+            return {
+                "success": True,
+                "chapter": chapter["title"],
+                "local_path": str(output_path),
+                "image_url": None,
+                "prompt": prompt,
+                "cached": True
+            }
+
+        result = self.generate_image(prompt, output_path=str(output_path))
+        result["chapter"] = chapter["title"]
+
+        # 简单限流，避免调用过快
+        time.sleep(0.5)
+        return result
+
+    def iter_generate_for_story(self, story: Dict, style: str = "cartoon"):
+        """生成器版本：逐章节产出进度与结果事件，供流式（SSE）进度推送使用。
+
+        依次 yield：
+        - {"type": "progress", "current", "total", "chapter"}：即将生成某页
+        - {"type": "page_done", "current", "total", "result"}：该页生成完成
+        """
+        chapters = story.get("chapters", [])
+        title = story.get("title", "")
+        total = len(chapters)
+
+        # 提取角色一致性描述（从第一个章节和标题中推断）
+        character_description = self._extract_characters(story)
+
+        for i, chapter in enumerate(chapters, 1):
+            yield {"type": "progress", "current": i, "total": total, "chapter": chapter}
+            result = self._generate_chapter_image(
+                story, chapter, i, title, style, character_description
+            )
+            yield {"type": "page_done", "current": i, "total": total, "result": result}
+
     def generate_for_story(self, story: Dict, style: str = "cartoon",
                           progress_callback=None) -> List[Dict]:
         """为整个故事的每个章节生成插画
@@ -166,49 +221,13 @@ class ImageGenerator:
         Returns:
             各章节图片生成结果列表
         """
-        chapters = story.get("chapters", [])
-        title = story.get("title", "")
         results = []
-        total = len(chapters)
-
-        # 提取角色一致性描述（从第一个章节和标题中推断）
-        character_description = self._extract_characters(story)
-
-        for i, chapter in enumerate(chapters, 1):
-            progress_callback(i, total, chapter) if progress_callback else None
-
-            prompt = self.generate_prompt(
-                chapter["content"],
-                title,
-                style,
-                character_description
-            )
-
-            # 根据章节序号命名输出文件
-            story_id = story.get("id", "unknown")
-            safe_title = self._safe_filename(title)[:30]
-            output_filename = f"{safe_title}_{story_id[:8]}_page{i}.png"
-            output_path = self.images_dir / output_filename
-
-            # 若有缓存则直接返回
-            if output_path.exists():
-                results.append({
-                    "success": True,
-                    "chapter": chapter["title"],
-                    "local_path": str(output_path),
-                    "image_url": None,
-                    "prompt": prompt,
-                    "cached": True
-                })
-                continue
-
-            result = self.generate_image(prompt, output_path=str(output_path))
-            result["chapter"] = chapter["title"]
-            results.append(result)
-
-            # 简单限流，避免调用过快
-            time.sleep(0.5)
-
+        for event in self.iter_generate_for_story(story, style):
+            if event["type"] == "progress":
+                if progress_callback:
+                    progress_callback(event["current"], event["total"], event["chapter"])
+            elif event["type"] == "page_done":
+                results.append(event["result"])
         return results
     
     def download_image(self, image_url: str, output_path: str) -> Path:
@@ -379,3 +398,8 @@ def generate_book_images(story: Dict, style: str = "cartoon",
                         progress_callback=None) -> List[Dict]:
     """对外暴露的绘本图片生成接口"""
     return image_generator.generate_for_story(story, style, progress_callback)
+
+
+def iter_generate_book_images(story: Dict, style: str = "cartoon"):
+    """对外暴露的流式绘本图片生成接口（逐页产出进度/结果事件）"""
+    return image_generator.iter_generate_for_story(story, style)

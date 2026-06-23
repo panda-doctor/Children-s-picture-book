@@ -157,12 +157,10 @@ const app = {
 
         this.currentStory.style = this.selectedStyle;
         this.showProgressModal();
-        this.updateProgress(10, "正在准备故事数据...");
+        this.updateProgress(2, "正在准备故事数据...");
 
         try {
-            this.updateProgress(30, "正在调用 AI 绘制插画...");
-
-            const response = await fetch("/api/book/generate", {
+            const response = await fetch("/api/book/generate/stream", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -171,23 +169,94 @@ const app = {
                 })
             });
 
-            this.updateProgress(80, "正在排版生成绘本...");
+            // 流式不可用时回退到一次性生成
+            if (!response.ok || !response.body) {
+                await this.generateBookFallback();
+                return;
+            }
 
-            const result = await response.json();
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let finalBook = null;
+            let errorMsg = null;
 
-            if (result.success) {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const chunks = buffer.split("\n\n");
+                buffer = chunks.pop();  // 余下不完整片段留待下次拼接
+
+                for (const chunk of chunks) {
+                    const line = chunk.trim();
+                    if (!line.startsWith("data:")) continue;
+                    let payload;
+                    try {
+                        payload = JSON.parse(line.slice(5).trim());
+                    } catch (e) {
+                        continue;
+                    }
+                    this.handleProgressEvent(payload);
+                    if (payload.stage === "done") finalBook = payload.book;
+                    if (payload.stage === "error") errorMsg = payload.message;
+                }
+            }
+
+            if (finalBook) {
                 this.updateProgress(100, "绘本生成完成！");
                 setTimeout(() => {
                     this.hideProgressModal();
-                    this.showResultModal(result.data);
+                    this.showResultModal(finalBook);
                 }, 500);
             } else {
                 this.hideProgressModal();
-                this.showMessage("❌ " + result.message, "error");
+                this.showMessage("❌ " + (errorMsg || "绘本生成失败"), "error");
             }
         } catch (error) {
             this.hideProgressModal();
             this.showMessage("❌ 生成失败：" + error.message, "error");
+        }
+    },
+
+    // 根据后端推送的进度事件更新进度条
+    handleProgressEvent(payload) {
+        if (payload.stage === "image") {
+            // 插画阶段占 10%~85%
+            const ratio = payload.total ? payload.current / payload.total : 0;
+            const percent = Math.round(10 + ratio * 75);
+            const chapter = payload.chapter ? `：${payload.chapter}` : "";
+            this.updateProgress(percent, `正在绘制第 ${payload.current}/${payload.total} 页插画${chapter}`);
+        } else if (payload.stage === "layout") {
+            this.updateProgress(90, payload.message || "正在排版生成绘本...");
+        } else if (payload.stage === "start") {
+            this.updateProgress(8, payload.message || "开始生成绘本");
+        }
+    },
+
+    // 回退：浏览器不支持流式读取时使用一次性接口
+    async generateBookFallback() {
+        this.updateProgress(30, "正在调用 AI 绘制插画...");
+        const response = await fetch("/api/book/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                story: this.currentStory,
+                style: this.selectedStyle
+            })
+        });
+        this.updateProgress(80, "正在排版生成绘本...");
+        const result = await response.json();
+        if (result.success) {
+            this.updateProgress(100, "绘本生成完成！");
+            setTimeout(() => {
+                this.hideProgressModal();
+                this.showResultModal(result.data);
+            }, 500);
+        } else {
+            this.hideProgressModal();
+            this.showMessage("❌ " + result.message, "error");
         }
     },
 
