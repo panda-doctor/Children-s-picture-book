@@ -1,5 +1,6 @@
 """儿童故事绘本应用 - Flask 主应用"""
 
+import hmac
 import json
 import os
 import uuid
@@ -7,11 +8,11 @@ from pathlib import Path
 
 from flask import (
     Flask, abort, render_template, request, jsonify, send_file,
-    send_from_directory, Response, stream_with_context
+    send_from_directory, Response, stream_with_context, session
 )
 from werkzeug.utils import secure_filename
 
-from config import Config, DATA_DIR, STORIES_DIR, BOOKS_DIR, IMAGES_DIR
+from config import Config, DATA_DIR, STORIES_DIR, BOOKS_DIR, IMAGES_DIR, PARENT_PASSWORD
 from utils.content_filter import validate_story
 from utils.story_parser import StoryParser, create_demo_story
 from utils.image_generator import generate_book_images, iter_generate_book_images
@@ -80,6 +81,33 @@ def reader(book_id):
     return render_template("reader.html", book_id=book_id)
 
 
+@app.route("/api/parent/status", methods=["GET"])
+def api_parent_status():
+    """查询当前会话是否已通过家长验证"""
+    return json_response(True, "查询成功", data={"verified": bool(session.get("parent_verified"))})
+
+
+@app.route("/api/parent/verify", methods=["POST"])
+def api_parent_verify():
+    """校验家长密码，通过后在当前会话内解锁编辑功能"""
+    data = request.get_json() or {}
+    password = str(data.get("password", ""))
+
+    # 使用 compare_digest 做定长安全比较，避免计时侧信道
+    if password and hmac.compare_digest(password, PARENT_PASSWORD):
+        session["parent_verified"] = True
+        return json_response(True, "家长验证成功", data={"verified": True})
+
+    return json_response(False, "家长密码错误", data={"verified": False}, status_code=401)
+
+
+@app.route("/api/parent/logout", methods=["POST"])
+def api_parent_logout():
+    """退出家长模式"""
+    session.pop("parent_verified", None)
+    return json_response(True, "已退出家长模式", data={"verified": False})
+
+
 @app.route("/api/story/validate", methods=["POST"])
 def api_validate_story():
     """校验故事内容安全性"""
@@ -130,6 +158,13 @@ def api_parse_story():
 @app.route("/api/story/upload", methods=["POST"])
 def api_upload_story():
     """上传故事文件"""
+    # 家长模式门控：上传自定义文件前需通过家长验证
+    if not session.get("parent_verified"):
+        return json_response(
+            False, "需要家长验证后才能上传自定义故事文件",
+            data={"need_parent": True}, status_code=403
+        )
+
     if "file" not in request.files:
         return json_response(False, "未找到上传文件", status_code=400)
     

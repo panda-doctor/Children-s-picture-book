@@ -9,6 +9,8 @@ const editorApp = {
         this.bindTabs();
         this.bindUploadArea();
         this.loadBooksList();
+        this.refreshParentLock();
+        this.bindParentInput();
     },
 
     bindTabs() {
@@ -107,11 +109,92 @@ const editorApp = {
                     window.location.href = "/";
                 }, 1000);
             } else {
+                // 未通过家长验证时，锁定上传区并弹出验证框
+                if (result.data && result.data.need_parent) {
+                    this.setParentUnlocked(false);
+                    this.promptParent();
+                }
                 this.showMessage("❌ " + result.message, "error");
             }
         } catch (error) {
             this.showMessage("❌ 上传失败：" + error.message, "error");
         }
+    },
+
+    /* ===== 家长模式 ===== */
+
+    async refreshParentLock() {
+        try {
+            const response = await fetch("/api/parent/status");
+            const result = await response.json();
+            this.setParentUnlocked(!!(result.data && result.data.verified));
+        } catch (error) {
+            this.setParentUnlocked(false);
+        }
+    },
+
+    setParentUnlocked(unlocked) {
+        const lock = document.getElementById("parentLock");
+        const inner = document.getElementById("uploadInner");
+        if (!lock || !inner) return;
+        lock.style.display = unlocked ? "none" : "flex";
+        inner.style.display = unlocked ? "block" : "none";
+    },
+
+    promptParent() {
+        const modal = document.getElementById("parentModal");
+        const input = document.getElementById("parentPassword");
+        modal.style.display = "flex";
+        input.value = "";
+        input.focus();
+    },
+
+    closeParentModal() {
+        document.getElementById("parentModal").style.display = "none";
+    },
+
+    bindParentInput() {
+        const input = document.getElementById("parentPassword");
+        if (input) {
+            input.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") this.verifyParent();
+            });
+        }
+    },
+
+    async verifyParent() {
+        const password = document.getElementById("parentPassword").value;
+        if (!password) {
+            this.showMessage("请输入家长密码", "error");
+            return;
+        }
+        try {
+            const response = await fetch("/api/parent/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password })
+            });
+            const result = await response.json();
+            if (result.success) {
+                this.closeParentModal();
+                this.setParentUnlocked(true);
+                this.showMessage("✅ 家长验证成功，已解锁编辑功能", "success");
+            } else {
+                this.showMessage("❌ " + result.message, "error");
+            }
+        } catch (error) {
+            this.showMessage("❌ 验证失败：" + error.message, "error");
+        }
+    },
+
+    async parentLogout() {
+        try {
+            await fetch("/api/parent/logout", { method: "POST" });
+        } catch (error) {
+            // 忽略网络错误，前端仍然回到锁定状态
+        }
+        this.setParentUnlocked(false);
+        this.showMessage("已退出家长模式", "info");
     },
 
     async loadBooksList() {

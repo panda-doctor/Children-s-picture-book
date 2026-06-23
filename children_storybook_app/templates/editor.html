@@ -41,20 +41,51 @@
 
             <!-- 上传文件 -->
             <div id="uploadTab" class="tab-content">
-                <div class="upload-area" id="uploadArea">
-                    <span class="upload-icon">📁</span>
-                    <p class="upload-text">拖拽 TXT 或 JSON 文件到这里</p>
-                    <p class="upload-hint">或点击选择文件</p>
-                    <input type="file" id="fileInput" accept=".txt,.json" style="display: none;">
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-primary" onclick="editorApp.uploadStory()">
-                        📤 上传并预览
+                <!-- 家长模式锁定层 -->
+                <div id="parentLock" class="parent-lock">
+                    <span class="lock-icon">🔒</span>
+                    <p>上传自定义故事文件需要家长验证</p>
+                    <button type="button" class="btn btn-primary" onclick="editorApp.promptParent()">
+                        🔑 家长验证
                     </button>
+                </div>
+
+                <!-- 解锁后显示的上传区 -->
+                <div id="uploadInner" style="display: none;">
+                    <div class="upload-area" id="uploadArea">
+                        <span class="upload-icon">📁</span>
+                        <p class="upload-text">拖拽 TXT 或 JSON 文件到这里</p>
+                        <p class="upload-hint">或点击选择文件</p>
+                        <input type="file" id="fileInput" accept=".txt,.json" style="display: none;">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" onclick="editorApp.uploadStory()">
+                            📤 上传并预览
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="editorApp.parentLogout()">
+                            🔓 退出家长模式
+                        </button>
+                    </div>
                 </div>
             </div>
         </section>
     </main>
+
+    <!-- 家长验证弹窗 -->
+    <div id="parentModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-btn" onclick="editorApp.closeParentModal()">&times;</span>
+            <div class="result-icon">🔒</div>
+            <h2>家长验证</h2>
+            <p>请输入家长密码以解锁编辑功能</p>
+            <input type="password" id="parentPassword" class="parent-input" placeholder="家长密码">
+            <div class="result-actions">
+                <button type="button" class="btn btn-primary" onclick="editorApp.verifyParent()">
+                    确认
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script src="/static/js/editor.js"></script>
 </body>

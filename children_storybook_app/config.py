@@ -27,6 +27,9 @@ for d in [DATA_DIR, STORIES_DIR, IMAGES_DIR, BOOKS_DIR, FILTERS_DIR, SAMPLES_DIR
 IMAGE_SIZE = os.environ.get("IMAGE_SIZE", "1024x768")
 IMAGE_TIMEOUT = int(os.environ.get("IMAGE_TIMEOUT", "30"))
 
+# 家长模式：上传自定义故事文件等编辑操作需先通过家长密码验证
+PARENT_PASSWORD = os.environ.get("PARENT_PASSWORD", "1234")
+
 # 应用配置
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "children-storybook-secret-key-2026")
