@@ -1,0 +1,35 @@
+# 儿童内容安全敏感词库
+# 每行一个词
+
+violence
+blood
+horror
+ghost
+kill
+death
+corpse
+porn
+sex
+naked
+gun
+bomb
+explosion
+war
+devil
+demon
+zombie
+skull
+curse
+abuse
+drug
+smoke
+alcohol
+gamble
+bully
+hate
+discrimination
+suicide
+torture
+murder
+terror
+monster

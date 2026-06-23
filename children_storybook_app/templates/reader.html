@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>阅读绘本 - 儿童故事绘本生成器</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/reader.css">
+</head>
+<body>
+    <div class="reader-page">
+        <header class="reader-header">
+            <a href="/" class="reader-nav-btn">🏠 首页</a>
+            <h1 id="readerTitle" class="reader-title">正在加载绘本...</h1>
+            <a id="downloadBtn" href="#" class="reader-nav-btn">⬇️ 下载</a>
+        </header>
+
+        <main class="book-container" id="bookContainer">
+            <div class="reader-loading">
+                <span class="spinner">📖</span>
+                <p>正在加载绘本...</p>
+            </div>
+        </main>
+
+        <div class="page-controls" id="pageControls" style="display: none;">
+            <button id="prevBtn" class="page-btn" onclick="readerApp.prevPage()" disabled>◀</button>
+            <span id="pageIndicator" class="page-indicator">1 / 1</span>
+            <button id="nextBtn" class="page-btn" onclick="readerApp.nextPage()">▶</button>
+        </div>
+    </div>
+
+    <script>
+        const BOOK_ID = "{{ book_id }}";
+    </script>
+    <script src="/static/js/reader.js"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+
+# ===== 虚拟环境 =====
+.venv/
+venv/
+env/
+
+# ===== 运行时生成的数据（绘本、插画、故事 JSON）=====
+# 这些目录由 config.py 在启动时自动重建，无需纳入版本库
+children_storybook_app/data/books/
+children_storybook_app/data/images/
+children_storybook_app/data/stories/
+
+# ===== 测试 / 工具工件 =====
+.playwright-cli/
+*.log
+
+# ===== AI 辅助工具的本地配置 =====
+.agents/
+.codex/
+.trae/
+.claude/
+
+# ===== 操作系统 / 编辑器 =====
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

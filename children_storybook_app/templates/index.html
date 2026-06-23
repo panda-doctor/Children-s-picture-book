@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>儿童故事绘本生成器</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="nav-icon">📚</span>
+            <span>儿童故事绘本生成器</span>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="active">创作绘本</a>
+            <a href="/editor">故事编辑器</a>
+            <a href="javascript:void(0)" onclick="app.goToLibrary()">我的绘本馆</a>
+        </div>
+    </nav>
+
+    <!-- 主容器 -->
+    <main class="main-container">
+        <!-- 左侧：故事录入 -->
+        <section class="story-form-section">
+            <div class="card">
+                <h1 class="page-title">✨ 创作你的专属绘本</h1>
+                <p class="page-subtitle">输入儿童故事，AI 自动生成精美插画和翻页绘本</p>
+
+                <form id="storyForm" class="story-form">
+                    <div class="form-group">
+                        <label for="storyTitle">故事标题</label>
+                        <input type="text" id="storyTitle" name="title" 
+                               placeholder="例如：小兔子找彩虹" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="storyAuthor">作者（可选）</label>
+                        <input type="text" id="storyAuthor" name="author" 
+                               placeholder="例如：小明">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="storyContent">故事正文</label>
+                        <textarea id="storyContent" name="content" rows="12" 
+                                  placeholder="在这里输入儿童故事，每 1-2 个段落会自动分为一页..." required></textarea>
+                        <small class="form-hint">建议 200-2000 字，适合 3-8 岁儿童阅读</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>绘画风格</label>
+                        <div class="style-options" id="styleOptions">
+                            <div class="style-card selected" data-style="cartoon">
+                                <span class="style-icon">🎨</span>
+                                <span class="style-name">卡通风格</span>
+                            </div>
+                            <div class="style-card" data-style="watercolor">
+                                <span class="style-icon">🖌️</span>
+                                <span class="style-name">水彩风格</span>
+                            </div>
+                            <div class="style-card" data-style="crayon">
+                                <span class="style-icon">🖍️</span>
+                                <span class="style-name">蜡笔风格</span>
+                            </div>
+                            <div class="style-card" data-style="flat">
+                                <span class="style-icon">⭐</span>
+                                <span class="style-name">扁平风格</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="app.loadDemoStory()">
+                            🎲 载入示例
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="app.validateAndParse()">
+                            🔍 安全检测与预览
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- 右侧：章节预览与生成 -->
+        <section class="preview-section">
+            <div class="card">
+                <h2 class="section-title">📖 章节预览</h2>
+                <div id="chapterPreview" class="chapter-preview">
+                    <div class="empty-state">
+                        <span class="empty-icon">📝</span>
+                        <p>请输入故事内容并点击"安全检测与预览"</p>
+                    </div>
+                </div>
+                
+                <div id="safetyResult" class="safety-result" style="display: none;"></div>
+                
+                <div class="generate-actions" id="generateActions" style="display: none;">
+                    <button type="button" class="btn btn-generate" onclick="app.generateBook()">
+                        🪄 生成绘本
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 进度弹窗 -->
+    <div id="progressModal" class="modal" style="display: none;">
+        <div class="modal-content modal-progress">
+            <div class="progress-animation">
+                <span class="magic-wand">🪄</span>
+                <div class="sparkles">✨✨✨</div>
+            </div>
+            <h2>正在施展魔法...</h2>
+            <p id="progressText">正在生成插画</p>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p class="progress-tip">绘本生成可能需要 1-3 分钟，请耐心等待</p>
+        </div>
+    </div>
+
+    <!-- 结果弹窗 -->
+    <div id="resultModal" class="modal" style="display: none;">
+        <div class="modal-content modal-result">
+            <span class="close-btn" onclick="app.closeResultModal()">&times;</span>
+            <div class="result-icon">🎉</div>
+            <h2>绘本生成成功！</h2>
+            <p id="resultText">你的专属绘本已经准备好啦</p>
+            <div class="result-actions">
+                <a id="readBookLink" href="#" class="btn btn-primary">📖 立即阅读</a>
+                <a id="downloadBookLink" href="#" class="btn btn-secondary">⬇️ 下载 PDF</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

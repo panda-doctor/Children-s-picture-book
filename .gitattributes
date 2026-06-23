@@ -1,0 +1,11 @@
+# 统一文本文件换行符为 LF，避免跨平台换行符抖动
+* text=auto eol=lf
+
+# 二进制文件不做转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.pdf binary
+*.ttc binary
+*.ttf binary
