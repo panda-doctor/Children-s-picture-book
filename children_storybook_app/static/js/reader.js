@@ -6,12 +6,15 @@ const readerApp = {
     bookData: null,
     currentPage: 0,
     totalPages: 0,
+    utterance: null,
 
     init() {
         if (typeof BOOK_ID === "undefined" || !BOOK_ID) {
             this.showError("绘本 ID 无效");
             return;
         }
+        // 离开页面时停止朗读，避免后台继续发声
+        window.addEventListener("beforeunload", () => this.stopSpeak());
         this.loadBook(BOOK_ID);
     },
 
@@ -54,6 +57,7 @@ const readerApp = {
 
         controls.style.display = "flex";
         this.updateControls();
+        this.initSpeak();
         this.bindKeyboard();
         this.bindSwipe();
     },
@@ -96,6 +100,7 @@ const readerApp = {
 
     nextPage() {
         if (this.currentPage < this.totalPages - 1) {
+            this.stopSpeak();
             this.currentPage++;
             this.updateControls();
         }
@@ -103,9 +108,107 @@ const readerApp = {
 
     prevPage() {
         if (this.currentPage > 0) {
+            this.stopSpeak();
             this.currentPage--;
             this.updateControls();
         }
+    },
+
+    /* ===== 语音朗读 ===== */
+
+    speechSupported() {
+        return typeof window !== "undefined" && "speechSynthesis" in window;
+    },
+
+    initSpeak() {
+        const btn = document.getElementById("speakBtn");
+        if (!btn) return;
+        if (!this.speechSupported()) {
+            // 浏览器不支持时隐藏按钮
+            btn.classList.add("unsupported");
+        }
+    },
+
+    // 根据页面类型取出可朗读的文本
+    getPageText(page) {
+        if (!page) return "";
+        if (page.type === "content") {
+            return page.content || page.chapter || "";
+        }
+        if (page.type === "cover") {
+            const author = page.author ? `，作者，${page.author}` : "";
+            return `${page.title || ""}${author}`;
+        }
+        if (page.type === "back") {
+            return `${page.title || ""}，故事结束`;
+        }
+        return page.content || page.title || "";
+    },
+
+    toggleSpeak() {
+        if (!this.speechSupported()) {
+            this.showToast("当前浏览器不支持语音朗读");
+            return;
+        }
+        const synth = window.speechSynthesis;
+        if (synth.speaking) {
+            this.stopSpeak();
+        } else {
+            this.speakCurrentPage();
+        }
+    },
+
+    speakCurrentPage() {
+        if (!this.speechSupported() || !this.bookData) return;
+        const text = this.getPageText(this.bookData.pages[this.currentPage]);
+        if (!text.trim()) {
+            this.showToast("本页没有可朗读的文字");
+            return;
+        }
+
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "zh-CN";
+        utterance.rate = 0.9;   // 略放慢，适合儿童跟读
+        utterance.pitch = 1.05;
+        utterance.onend = () => this.setSpeakingState(false);
+        utterance.onerror = () => this.setSpeakingState(false);
+
+        this.utterance = utterance;
+        window.speechSynthesis.speak(utterance);
+        this.setSpeakingState(true);
+    },
+
+    stopSpeak() {
+        if (!this.speechSupported()) return;
+        window.speechSynthesis.cancel();
+        this.setSpeakingState(false);
+    },
+
+    setSpeakingState(speaking) {
+        const btn = document.getElementById("speakBtn");
+        if (!btn) return;
+        btn.classList.toggle("speaking", speaking);
+        btn.textContent = speaking ? "⏹" : "🔊";
+        btn.title = speaking ? "停止朗读" : "朗读本页";
+    },
+
+    showToast(message) {
+        // 复用错误提示样式的轻量浮层
+        let toast = document.getElementById("readerToast");
+        if (!toast) {
+            toast = document.createElement("div");
+            toast.id = "readerToast";
+            toast.style.cssText = "position:fixed;bottom:100px;left:50%;transform:translateX(-50%);" +
+                "background:rgba(0,0,0,0.75);color:#fff;padding:10px 22px;border-radius:24px;" +
+                "font-size:15px;z-index:3000;transition:opacity .3s ease;";
+            document.body.appendChild(toast);
+        }
+        toast.textContent = message;
+        toast.style.opacity = "1";
+        clearTimeout(this._toastTimer);
+        this._toastTimer = setTimeout(() => { toast.style.opacity = "0"; }, 2500);
     },
 
     bindKeyboard() {

@@ -152,6 +152,30 @@
     text-align: center;
 }
 
+/* 朗读按钮 */
+.speak-btn {
+    background: var(--success, #1DD1A1);
+}
+
+.speak-btn:hover:not(:disabled) {
+    background: #15b88c;
+    transform: scale(1.1);
+}
+
+.speak-btn.speaking {
+    background: #FF6B6B;
+    animation: speak-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes speak-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.6); }
+    50% { box-shadow: 0 0 0 12px rgba(255, 107, 107, 0); }
+}
+
+.speak-btn.unsupported {
+    display: none;
+}
+
 /* 页码提示 */
 .page-corner {
     position: absolute;
